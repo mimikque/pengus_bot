@@ -92,7 +92,7 @@ class CreateTicketView(ui.View):
         if self.config["moderator_role"] != None:
             overwrites[discord.utils.get(interaction.guild.roles, id = self.config["moderator_config"])] = discord.PermissionOverwrite(read_messages=True),
         channel = await category.create_text_channel(
-            name  = f'#0000',
+            name  = f'#{''.join(random.choices('0123456789', k=5))}',
             topic = f'{interaction.user.id}:{topic}',
             overwrites = overwrites,
         )
