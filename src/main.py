@@ -1,4 +1,6 @@
+import json
 import os
+import platform
 from dotenv import load_dotenv
 from discord.ext import commands
 import discord
@@ -8,10 +10,9 @@ import logger
 intents = discord.Intents.default()
 intents.message_content = True
 
-config = {
-    "prefix": "!",
-}
-
+config = {}
+with open('config.json', 'r') as f:
+    config = json.loads(f.read())
 
 class DiscordBot(commands.Bot):
     def __init__(self) -> None:
@@ -41,13 +42,6 @@ class DiscordBot(commands.Bot):
                         f"Failed to load extension {extension}\n{exception}"
                     )
 
-    @status_task.before_loop
-    async def before_status_task(self) -> None:
-        """
-        Before starting the status changing task, we make sure the bot is ready
-        """
-        await self.wait_until_ready()
-
     async def setup_hook(self) -> None:
         """
         This will just be executed when the bot starts the first time.
@@ -59,13 +53,13 @@ class DiscordBot(commands.Bot):
             f"Running on: {platform.system()} {platform.release()} ({os.name})"
         )
         self.logger.info("-------------------")
-        await self.load_cogs()
-        self.status_task.start()    
+        await self.load_cogs() 
+
     
-    @commands.hybrid_command(name="ping")
-    async def ping(self, ctx: commands.Context[commands.Bot]) -> None:
-        """Pong!"""
-        await ctx.send("Pong!")
+    def set_json(self, key, value):
+        self.config[key] = value
+        with open('config.json', 'w') as f:
+            json.dump(self.config, f)
 
 
 load_dotenv()
@@ -74,7 +68,6 @@ bot = DiscordBot()
 
 @bot.command(name="sync")
 async def tree_sync(ctx):
-        bot.logger.info("COMMAND RUN!")
         try:
             #.tree.copy_global_to(guild=Snowflake(1259941990515216475))
             #synced = await bot.tree.sync(guild=1259941990515216475)
