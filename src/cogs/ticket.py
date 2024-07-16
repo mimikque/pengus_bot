@@ -37,11 +37,24 @@ class Ticket(commands.Cog, name="ticket"):
             view = CreateTicketView(self.bot.config)
         )
     
+    @commands.hybrid_command(name="mod_role")
+    async def mod_role(self, ctx: commands.Context, moderator_role: str) -> None:
+        role = discord.utils.get(ctx.guild.roles, name=moderator_role)
+        self.bot.config["moderator_role"] = role.id
+    
 
     @ticket_setup.autocomplete(name='ticket_category')
     async def ticket_category_autocomplete(self, interaction: discord.Interaction, current: str):
         categories = [category.name for category in interaction.guild.categories]
         categories.append(self.bot.config["create_one_for_me"])
+        return [
+            app_commands.Choice(name=category, value=category)
+            for category in categories if current.lower() in category.lower()
+        ]
+    
+    @mod_role.autocomplete(name='moderator_role')
+    async def moderator_role_autocomplete(self, interaction: discord.Interaction, current: str):
+        categories = [category.name for category in interaction.guild.roles]
         return [
             app_commands.Choice(name=category, value=category)
             for category in categories if current.lower() in category.lower()
@@ -71,13 +84,18 @@ class CreateTicketView(ui.View):
             if ch.topic == f'{interaction.user.id}:{topic}':
                 await interaction.followup.send(f'You already have a ticket in {ch.mention}', ephemeral=True)
                 return
-            
+        
+        overwrites = {
+            interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
+        }
+        if self.config["moderator_role"] != None:
+            overwrites[discord.utils.get(interaction.guild.roles, id = self.config["moderator_config"])] = discord.PermissionOverwrite(read_messages=True),
         channel = await category.create_text_channel(
             name  = f'#0000',
-            topic = f'{interaction.user.id}:{topic}'
+            topic = f'{interaction.user.id}:{topic}',
+            overwrites = overwrites,
         )
-
-        await interaction.followup.send(f"You selected {select.values[0]}", ephemeral=True)
 
 # And then we finally add the cog to the bot so that it can load, unload, reload and use it's content.
 async def setup(bot) -> None:
