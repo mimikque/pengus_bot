@@ -1,104 +1,128 @@
+import random
+from typing import List
 from datetime import datetime
 import random
-import traceback
 import discord
-from discord.ext import commands, tasks
-from discord.ext.commands import Context
-from typing import Literal, Optional
+from discord.ext import commands
 import discord.ui as ui
 from discord import app_commands
 
-from pengus_bot.src.main import DiscordBot
+from config import Configuration, TicketConfiguration
+
 
 
 # Here we name the cog and create a new class for the cog.
 class Ticket(commands.Cog, name="ticket"):
     def __init__(self, bot) -> None:
         self.bot = bot
-
-    @commands.hybrid_command(name="ticket_setup")
-    async def ticket_setup(self, ctx: commands.Context, ticket_category: str) -> None:
+        self.config: Configuration = bot.config
+        self.ticket: TicketConfiguration = self.config.ticket
+    
+    @app_commands.command(name="ticket_setup")
+    async def ticket_setup(self, interaction: discord.Interaction, ticket_category: str):
         category = ""
-        if ticket_category == self.bot.config["create_one_for_me"]:
-            category = await ctx.guild.create_category(
-                name = "tickets"
-            )
+
+        if ticket_category == self.ticket.create_one_for_me:
+            category = await interaction.guild.create_category(name="tickets")
         else:
-            category = discord.utils.get(ctx.guild.categories, name=ticket_category)
+            category = discord.utils.get(interaction.guild.categories, name=ticket_category)
 
-        
-        self.bot.set_json("ticket_category", category.id)
-        await ctx.send(
-            embed = discord.Embed(
-                title="Ticket",
-                color=discord.Color.green(),
-                description="beschreibung oder so... idk"
-            ),
-            view = CreateTicketView(self.bot.config)
-        )
+        self.ticket.ticket_category_id = category.id
+        await self.setup_ticket_channel(interaction.channel)
     
-    @commands.hybrid_command(name="mod_role")
-    async def mod_role(self, ctx: commands.Context, moderator_role: str) -> None:
-        role = discord.utils.get(ctx.guild.roles, name=moderator_role)
-        self.bot.config["moderator_role"] = role.id
-    
-
     @ticket_setup.autocomplete(name='ticket_category')
     async def ticket_category_autocomplete(self, interaction: discord.Interaction, current: str):
         categories = [category.name for category in interaction.guild.categories]
-        categories.append(self.bot.config["create_one_for_me"])
+        categories.append(self.ticket.create_one_for_me)
         return [
             app_commands.Choice(name=category, value=category)
             for category in categories if current.lower() in category.lower()
         ]
     
-    @mod_role.autocomplete(name='moderator_role')
+    @app_commands.command(name="moderator_role")
+    async def moderator_role(self, interaction: discord.Interaction, moderator_role: str):
+        moderator = ""
+
+        if moderator_role == self.ticket.create_one_for_me:
+            moderator = await interaction.guild.create_role(name="ticket moderator")
+            await interaction.response.send_message(f"Created role {moderator.mention}.", ephemeral=True)
+        else:
+            moderator = discord.utils.get(interaction.guild.roles, name=moderator_role)
+            await interaction.response.send_message(f"Please use `!save` to store the configuration!", ephemeral=True)
+
+        self.config.roles.moderator = moderator.id
+        
+    
+    @moderator_role.autocomplete(name='moderator_role')
     async def moderator_role_autocomplete(self, interaction: discord.Interaction, current: str):
         categories = [category.name for category in interaction.guild.roles]
+        categories.append(self.ticket.create_one_for_me)
         return [
             app_commands.Choice(name=category, value=category)
             for category in categories if current.lower() in category.lower()
         ]
 
 
-class CreateTicketView(ui.View):    
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
+    async def setup_ticket_channel(self, channel: discord.TextChannel):
+        await channel.send(
+            embed = discord.Embed(
+                title="Ticket",
+                color=discord.Colour.green(),
+                description="beschreibung oder so... idk"
+            ),
+            view = TicketChannelView(
+                    self.ticket.topics,
+                    self.ticket.get_ticket_category(channel.guild),
+                    self.config.roles.moderator
+                )
+        )
 
 
-    @ui.select(
-            options = [
-                discord.SelectOption(label="Staff Application", value="staff_application", description="Apply to be part of the staff team"),
-                discord.SelectOption(label="Tier Test", value="tier_test", description="Take a test to prove your skills"),
-                discord.SelectOption(label="Other Questions", value="other_questions", description="Ask any other questions")
-            ],
-            placeholder="Make a selection"
-    )
-    async def topic_select(self, interaction: discord.Interaction, select: ui.Select):
+class TicketChannelView(ui.View):
+    def __init__(self, topics: List[discord.SelectOption], ticket_category: discord.CategoryChannel, moderator_role = None):
+        super().__init__(timeout=None)
+        self.ticket_category: discord.CategoryChannel = ticket_category
+        self.moderator_role = moderator_role
+
+
+        self.select = ui.Select(
+                placeholder ="Make a selection",
+                options = topics,
+                custom_id ="topic_select"
+            )
+        self.select.callback = self.topic_select_callback
+        self.add_item(self.select)
+        
+    
+    async def topic_select_callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
-        topic = select.values[0]
-        category: discord.CategoryChannel = discord.utils.get(interaction.guild.categories, id = self.config["ticket_category"])
-        for ch in category.text_channels:
-            if ch.topic == f'{interaction.user.id}:{topic}':
-                await interaction.followup.send(f'You already have a ticket in {ch.mention}', ephemeral=True)
-                return
+        topic = self.select.values[0]
+        if (ch := self.already_has_ticket_for(topic, interaction.user.id)) != None:
+            await interaction.followup.send(f'You already have a ticket in {ch.mention}', ephemeral=True)
+            return
         
         overwrites = {
             interaction.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             interaction.guild.me: discord.PermissionOverwrite(read_messages=True),
+            interaction.user: discord.PermissionOverwrite(read_messages=True)
         }
-        if self.config["moderator_role"] != None:
-            overwrites[discord.utils.get(interaction.guild.roles, id = self.config["moderator_config"])] = discord.PermissionOverwrite(read_messages=True),
-        channel = await category.create_text_channel(
+
+        if self.moderator_role != None:
+            overwrites[self.moderator_role] = discord.PermissionOverwrite(read_messages=True)
+        
+        channel = await self.ticket_category.create_text_channel(
             name  = f'#{''.join(random.choices('0123456789', k=5))}',
             topic = f'{interaction.user.id}:{topic}',
             overwrites = overwrites,
         )
 
-# And then we finally add the cog to the bot so that it can load, unload, reload and use it's content.
-async def setup(bot: DiscordBot) -> None:
-    bot.logger.info("Skipped old ticket cog")
-    return;
+    
+    def already_has_ticket_for(self, topic, user_id):
+        for ch in self.ticket_category.text_channels:
+            if ch.topic == f'{user_id}:{topic}':
+                return ch
+        return None
+
+async def setup(bot) -> None:
     await bot.add_cog(Ticket(bot))

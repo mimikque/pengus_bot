@@ -1,0 +1,10 @@
+{
+    "prefix": "!",
+    "ticket": {
+        "create_one_for_me" : "create one for me",
+        "topics" : ["Get tested", "Apply for staff", "other question"]
+    },
+    "roles": {
+
+    }
+}

@@ -1,30 +1,38 @@
 import json
 import os
 import platform
+import traceback
 from dotenv import load_dotenv
 from discord.ext import commands
 import discord
 
 import logger
-from pengus_bot.src.config import Configuration
+from config import Configuration
 
 intents = discord.Intents.default()
 intents.message_content = True
 
 config = {}
 with open('config.json', 'r') as f:
-    config = json.loads(f.read())
+    config = f.read()
+with open('config.json.old', 'w') as f:
+    f.write(config)
+config = Configuration(config)
+
 
 class DiscordBot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(
-            command_prefix=commands.when_mentioned_or(config["prefix"]),
+            command_prefix=commands.when_mentioned_or(config.prefix),
             intents=intents,
             help_command=None,
         )
         self.logger = logger.logger
-        self.config: Configuration = Configuration(config)
-        self.logger.info("Prefix: " + config["prefix"])
+        self.config: Configuration = config
+        self.logger.info("Prefix: " + self.config.prefix)
+
+        with open('config.json', 'w') as f:
+            f.write(json.dumps(self.config.to_dict(), indent=4))
 
 
     async def load_cogs(self) -> None:
@@ -42,6 +50,7 @@ class DiscordBot(commands.Bot):
                     self.logger.error(
                         f"Failed to load extension {extension}\n{exception}"
                     )
+                    traceback.print_exc()
 
     async def setup_hook(self) -> None:
         """
@@ -57,10 +66,10 @@ class DiscordBot(commands.Bot):
         await self.load_cogs() 
 
     
-    def set_json(self, key, value):
-        self.config[key] = value
+    @commands.command(name="save")
+    async def save(self, ctx: commands.Context):
         with open('config.json', 'w') as f:
-            json.dump(self.config, f)
+            f.write(json.dumps(self.config.to_dict(), indent=4))
 
 
 load_dotenv()
