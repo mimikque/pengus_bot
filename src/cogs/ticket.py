@@ -8,13 +8,13 @@ from typing import Literal, Optional
 import discord.ui as ui
 from discord import app_commands
 
+from pengus_bot.src.main import DiscordBot
+
 
 # Here we name the cog and create a new class for the cog.
 class Ticket(commands.Cog, name="ticket"):
     def __init__(self, bot) -> None:
         self.bot = bot
-        self.bot.orders = {}
-        self.bot.message_orders = {}
 
     @commands.hybrid_command(name="ticket_setup")
     async def ticket_setup(self, ctx: commands.Context, ticket_category: str) -> None:
@@ -98,5 +98,7 @@ class CreateTicketView(ui.View):
         )
 
 # And then we finally add the cog to the bot so that it can load, unload, reload and use it's content.
-async def setup(bot) -> None:
+async def setup(bot: DiscordBot) -> None:
+    bot.logger.info("Skipped old ticket cog")
+    return;
     await bot.add_cog(Ticket(bot))

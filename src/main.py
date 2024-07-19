@@ -6,6 +6,7 @@ from discord.ext import commands
 import discord
 
 import logger
+from pengus_bot.src.config import Configuration
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -22,7 +23,7 @@ class DiscordBot(commands.Bot):
             help_command=None,
         )
         self.logger = logger.logger
-        self.config = config
+        self.config: Configuration = Configuration(config)
         self.logger.info("Prefix: " + config["prefix"])
 
 
