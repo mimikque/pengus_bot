@@ -177,7 +177,7 @@ class TicketChannelView(ui.View):
             modal.on_submit = on_submit
 
             # Send the modal to the user
-            await interaction.send_modal(modal)
+            await interaction.response.send_modal(modal)
             return  # Exit the loop after handling the selected topic
     
     async def reset_view(self, message: discord.Message):
