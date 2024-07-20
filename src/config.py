@@ -45,11 +45,7 @@ class TicketConfiguration(Configuration):
     def create(self, json_data: dict):
         self.topics: List[discord.SelectOption] = []
         for topic in json_data["topics"]:
-            self.topics.append(discord.SelectOption(
-                label = topic["label"],
-                value = topic["value"],
-                description = topic["description"]
-            ))
+            self.topics.append(Topic(topic))
 
         self.ticket_category_id = json_data.get("ticket_category")
         self.create_one_for_me = json_data.get("create_one_for_me")
@@ -66,3 +62,25 @@ class RolesConfiguration(Configuration):
     
     def get_moderator(self, guild):
         return discord.utils.get(guild.roles, id = self.moderator)
+    
+
+class Topic(Configuration):
+    def __init__(self, json_str=None):
+        super().__init__(json_str)
+    
+    def create(self, json_data: dict):
+        self.label = json_data["label"]
+        self.value = json_data["value"]
+        self.description = json_data["description"]
+        self.questions = json_data.get("questions")
+    
+    def __call__(self) -> discord.SelectOption:
+        return discord.SelectOption(
+            label = self.label,
+            value = self.value,
+            description = self.description
+            )
+    
+    @staticmethod
+    def to_discord_options(custom_options):
+        return [option() for option in custom_options]

@@ -1,10 +1,33 @@
 {
     "prefix": "!",
     "ticket": {
-        "create_one_for_me" : "create one for me",
-        "topics" : ["Get tested", "Apply for staff", "other question"]
+        "topics": [
+            {
+                "label": "Get tested",
+                "value": "get_tested",
+                "description": "Get tier tested for fbf",
+                "questions": [
+                    "WHAT IS YOUR MINECRAFT USERNAME",
+                    "WHAT IS YOUR PING"
+                ]
+            },
+            {
+                "label": "Apply for staff",
+                "value": "staff_apply",
+                "description": "Apply for staff",
+                "questions": null
+            },
+            {
+                "label": "Other question",
+                "value": "other_question",
+                "description": "Something else?",
+                "questions": null
+            }
+        ],
+        "ticket_category_id": null,
+        "create_one_for_me": "create one for me"
     },
     "roles": {
-
+        "moderator": 1263999531947786253
     }
 }

@@ -5,17 +5,23 @@
             {
                 "label": "Get tested",
                 "value": "get_tested",
-                "description": "a"
+                "description": "Get tier tested for fbf",
+                "questions": [
+                    "WHAT IS YOUR MINECRAFT USERNAME",
+                    "WHAT IS YOUR PING"
+                ]
             },
             {
                 "label": "Apply for staff",
                 "value": "staff_apply",
-                "description": "a"
+                "description": "Apply for staff",
+                "questions": null
             },
             {
                 "label": "Other question",
                 "value": "other_question",
-                "description": "a"
+                "description": "Something else?",
+                "questions": null
             }
         ],
         "ticket_category_id": null,
