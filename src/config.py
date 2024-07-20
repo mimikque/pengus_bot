@@ -63,3 +63,6 @@ class RolesConfiguration(Configuration):
     
     def create(self, json_data: dict):
         self.moderator = json_data.get("moderator")
+    
+    def get_moderator(self, guild):
+        return discord.utils.get(guild.roles, id = self.moderator)

@@ -65,12 +65,6 @@ class DiscordBot(commands.Bot):
         self.logger.info("-------------------")
         await self.load_cogs() 
 
-    
-    @commands.command(name="save")
-    async def save(self, ctx: commands.Context):
-        with open('config.json', 'w') as f:
-            f.write(json.dumps(self.config.to_dict(), indent=4))
-
 
 load_dotenv()
 
@@ -79,15 +73,19 @@ bot = DiscordBot()
 @bot.command(name="sync")
 async def tree_sync(ctx):
         try:
-            #.tree.copy_global_to(guild=Snowflake(1259941990515216475))
-            #synced = await bot.tree.sync(guild=1259941990515216475)
-            #await ctx.send(f'Successfully synced to guild {len(synced)} commands.')
-
             synced = await bot.tree.sync()
             await ctx.send(f'Successfully synced {len(synced)} commands.')
         except Exception as e:
             pass
             await ctx.send(f'An error occurred: {str(e)}')
+
+@bot.command(name="save")
+async def save(ctx: commands.Context):
+    await ctx.defer()
+    with open('config.json', 'w') as f:
+        f.write(json.dumps(bot.config.to_dict(), indent=4))
+    #await ctx.interaction.message.delete()
+    await ctx.reply("Saved config succesfuly!", ephemeral=True)
 
 
 bot.run(os.getenv("TOKEN"))
