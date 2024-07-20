@@ -7,21 +7,27 @@
                 "value": "get_tested",
                 "description": "Get tier tested for fbf",
                 "questions": [
-                    "WHAT IS YOUR MINECRAFT USERNAME",
-                    "WHAT IS YOUR PING"
+                    "What is your Minecraft username?",
+                    "What is your ping?"
                 ]
             },
             {
                 "label": "Apply for staff",
                 "value": "staff_apply",
                 "description": "Apply for staff",
-                "questions": null
+                "questions": [
+                    "Whats your name?",
+                    "What would you like to apply for?",
+                    "Why should we pick you?"
+                ]
             },
             {
                 "label": "Other question",
                 "value": "other_question",
                 "description": "Something else?",
-                "questions": null
+                "questions": [
+                    "Your question or abut"
+                ]
             }
         ],
         "ticket_category_id": null,
