@@ -123,11 +123,9 @@ class TicketChannelView(ui.View):
         
     
     async def topic_select_callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-
         selected_topic = self.select.values[0]
         if (ch := self.already_has_ticket_for(selected_topic, interaction.user.id)) != None:
-            await interaction.followup.send(f'You already have a ticket in {ch.mention}', ephemeral=True)
+            await interaction.response.send(f'You already have a ticket in {ch.mention}', ephemeral=True)
             await self.reset_view(interaction.message)
             return
         
@@ -154,6 +152,7 @@ class TicketChannelView(ui.View):
             if not topic.questions:
                 await self.setup_ticket(channel, {})
                 await self.reset_view(interaction.message)
+                await interaction.response.send_message(f"Ticket created in {channel.mention}", ephemeral=True)
                 return
 
             # Create a modal dialog
@@ -172,6 +171,7 @@ class TicketChannelView(ui.View):
                 answers = {item.label: item.value for item in modal.children}
                 await self.setup_ticket(channel, answers)
                 await self.reset_view(interaction.message)
+                await interaction.response.send_message(f"Ticket created in {channel.mention}", ephemeral=True)
 
             # Set the modal's submit behavior
             modal.on_submit = on_submit
@@ -204,10 +204,11 @@ class TicketChannelView(ui.View):
             description="developed by gotRoasted",
             color=discord.Colour.green()
         )
-        for question, anwser in fields:
+        for question, anwser in fields.items():
             embed.add_field(
                 name=question,
-                value=anwser
+                value=anwser,
+                inline=False
             )
 
         await channel.send(
@@ -220,15 +221,15 @@ class CloseTicketView(ui.View):
         super().__init__(timeout=None)
         self.ticket_cog: Ticket = ticket_cog
 
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="🔒")
     async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
-        interaction.response.defer()
+        await interaction.response.defer()
         if await self.ticket_cog.close_ticket(interaction.channel, interaction.user) == PermissionError:
-            await interaction.response.send_message("You don't have permissions to close this ticket.", ephemeral=True)
-        else:
-            await interaction.response.send("Ticket closed!", ephemeral=True)
+            await interaction.followup.send("You don't have permissions to close this ticket.", ephemeral=True)
+        #else:
+        #    await interaction.followup.send("Ticket closed!", ephemeral=True)
     
-    @discord.ui.button(label="Close With Reason", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="Close With Reason", style=discord.ButtonStyle.danger, emoji="🔒")
     async def close_with_reason(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(
             CloseTicketWithReason(self.ticket_cog.close_ticket_with_reason)
@@ -242,11 +243,11 @@ class CloseTicketWithReason(ui.Modal, title='Close Ticket'):
         self.close_ticket_with_reason = close_ticket_with_reason
 
     async def on_submit(self, interaction: discord.Interaction):
-        interaction.response.defer()
+        await interaction.response.defer()
         if await self.close_ticket_with_reason(interaction.channel, interaction.user, self.reason) == PermissionError:
-            await interaction.response.send_message("You don't have permissions to close this ticket.", ephemeral=True)
-        else:
-            await interaction.response.send("Ticket closed!", ephemeral=True)
+            await interaction.followup.send("You don't have permissions to close this ticket.", ephemeral=True)
+        #else:
+        #    await interaction.followup.send("Ticket closed!", ephemeral=True)
 
 async def setup(bot) -> None:
     await bot.add_cog(Ticket(bot))
