@@ -8,7 +8,7 @@ import discord.ui as ui
 from discord import app_commands
 from discord.utils import MISSING
 
-from config import Configuration, TicketConfiguration
+from config import Configuration, TicketConfiguration, Topic
 
 
 
@@ -105,7 +105,7 @@ class Ticket(commands.Cog, name="ticket"):
 
 
 class TicketChannelView(ui.View):
-    def __init__(self, topics: List[discord.SelectOption], ticket_category: discord.CategoryChannel, ticket_cog, moderator_role = None):
+    def __init__(self, topics: List[Topic], ticket_category: discord.CategoryChannel, ticket_cog, moderator_role = None):
         super().__init__(timeout=None)
         self.ticket_category: discord.CategoryChannel = ticket_category
         self.moderator_role = moderator_role
@@ -115,7 +115,7 @@ class TicketChannelView(ui.View):
 
         self.select = ui.Select(
                 placeholder ="Make a selection",
-                options = topics,
+                options = Topic.to_discord_options(topics),
                 custom_id ="topic_select"
             )
         self.select.callback = self.topic_select_callback
@@ -125,8 +125,8 @@ class TicketChannelView(ui.View):
     async def topic_select_callback(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
-        topic = self.select.values[0]
-        if (ch := self.already_has_ticket_for(topic, interaction.user.id)) != None:
+        selected_topic = self.select.values[0]
+        if (ch := self.already_has_ticket_for(selected_topic, interaction.user.id)) != None:
             await interaction.followup.send(f'You already have a ticket in {ch.mention}', ephemeral=True)
             await self.reset_view(interaction.message)
             return
@@ -142,13 +142,43 @@ class TicketChannelView(ui.View):
         
         channel = await self.ticket_category.create_text_channel(
             name  = f'#{''.join(random.choices('0123456789', k=5))}',
-            topic = f'{interaction.user.id}:{topic}',
+            topic = f'{interaction.user.id}:{selected_topic}',
             overwrites = overwrites,
         )
 
         #TODO dynamcily create modal for questions(if questions for this topic arent empty-configured)
-        await self.setup_ticket(channel, {})
-        await self.reset_view(interaction.message)
+        for topic in self.topics:
+            if topic.value != selected_topic:
+                continue
+            
+            if not topic.questions:
+                await self.setup_ticket(channel, {})
+                await self.reset_view(interaction.message)
+                return
+
+            # Create a modal dialog
+            modal = discord.ui.Modal(title="Topic Questions")
+
+            # Add text input fields for each question
+            for question in topic.questions:
+                modal.add_item(discord.ui.TextInput(
+                    label=question,
+                    placeholder='Your answer here...',
+                    required=True
+                ))
+
+            # Define the submit behavior
+            async def on_submit(interaction: discord.Interaction):
+                answers = {item.label: item.value for item in modal.children}
+                await self.setup_ticket(channel, answers)
+                await self.reset_view(interaction.message)
+
+            # Set the modal's submit behavior
+            modal.on_submit = on_submit
+
+            # Send the modal to the user
+            await interaction.send_modal(modal)
+            return  # Exit the loop after handling the selected topic
     
     async def reset_view(self, message: discord.Message):
         self.select = ui.Select(
