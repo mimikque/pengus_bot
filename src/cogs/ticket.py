@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 import discord.ui as ui
 from discord import app_commands
+from discord.utils import MISSING
 
 from config import Configuration, TicketConfiguration
 
@@ -71,6 +72,7 @@ class Ticket(commands.Cog, name="ticket"):
         view = TicketChannelView(
                     self.ticket.topics,
                     self.ticket.get_ticket_category(channel.guild),
+                    self,
                     self.config.roles.get_moderator(channel.guild)
                 )
         self.bot.add_view(view)
@@ -81,15 +83,34 @@ class Ticket(commands.Cog, name="ticket"):
                 description="beschreibung oder so... idk"
             ),
             view = view
+        )    
+
+    async def close_ticket(self, channel: discord.TextChannel, user: discord.Member):
+        if not self.config.roles.get_moderator(channel.guild) in user.roles:
+            return PermissionError;
+        channel.send(
+            f"Ticket closed by {user.mention}"
         )
+        #TODO save/export backup of the channel
+        await channel.delete()
+    
+    async def close_ticket_with_reason(self, channel: discord.TextChannel, user: discord.Member, reason: str):
+        if not self.config.roles.get_moderator(channel.guild) in user.roles:
+            return PermissionError;
+        channel.send(
+            f"Ticket closed by {user.mention} \nreason: >>{reason}<<"
+        )
+        #TODO save/export backup of the channel
+        await channel.delete()
 
 
 class TicketChannelView(ui.View):
-    def __init__(self, topics: List[discord.SelectOption], ticket_category: discord.CategoryChannel, moderator_role = None):
+    def __init__(self, topics: List[discord.SelectOption], ticket_category: discord.CategoryChannel, ticket_cog, moderator_role = None):
         super().__init__(timeout=None)
         self.ticket_category: discord.CategoryChannel = ticket_category
         self.moderator_role = moderator_role
         self.topics = topics
+        self.ticket_cog = ticket_cog
 
 
         self.select = ui.Select(
@@ -107,6 +128,7 @@ class TicketChannelView(ui.View):
         topic = self.select.values[0]
         if (ch := self.already_has_ticket_for(topic, interaction.user.id)) != None:
             await interaction.followup.send(f'You already have a ticket in {ch.mention}', ephemeral=True)
+            await self.reset_view(interaction.message)
             return
         
         overwrites = {
@@ -123,7 +145,9 @@ class TicketChannelView(ui.View):
             topic = f'{interaction.user.id}:{topic}',
             overwrites = overwrites,
         )
-        
+
+        #TODO dynamcily create modal for questions(if questions for this topic arent empty-configured)
+        await self.setup_ticket(channel, {})
         await self.reset_view(interaction.message)
     
     async def reset_view(self, message: discord.Message):
@@ -144,6 +168,55 @@ class TicketChannelView(ui.View):
             if ch.topic == f'{user_id}:{topic}':
                 return ch
         return None
+    
+    async def setup_ticket(self, channel: discord.TextChannel, fields: dict):
+        embed = discord.Embed(
+            description="developed by gotRoasted",
+            color=discord.Colour.green()
+        )
+        for question, anwser in fields:
+            embed.add_field(
+                name=question,
+                value=anwser
+            )
+
+        await channel.send(
+            embed=embed,
+            view=CloseTicketView(self.ticket_cog)
+        )
+    
+class CloseTicketView(ui.View):
+    def __init__(self, ticket_cog):
+        super().__init__(timeout=None)
+        self.ticket_cog: Ticket = ticket_cog
+
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger)
+    async def close(self, interaction: discord.Interaction, button: discord.ui.Button):
+        interaction.response.defer()
+        if await self.ticket_cog.close_ticket(interaction.channel, interaction.user) == PermissionError:
+            await interaction.response.send_message("You don't have permissions to close this ticket.", ephemeral=True)
+        else:
+            await interaction.response.send("Ticket closed!", ephemeral=True)
+    
+    @discord.ui.button(label="Close With Reason", style=discord.ButtonStyle.danger)
+    async def close_with_reason(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(
+            CloseTicketWithReason(self.ticket_cog.close_ticket_with_reason)
+        )
+
+class CloseTicketWithReason(ui.Modal, title='Close Ticket'):
+    reason = ui.TextInput(label='Reason')
+
+    def __init__(self, close_ticket_with_reason) -> None:
+        super().__init__()
+        self.close_ticket_with_reason = close_ticket_with_reason
+
+    async def on_submit(self, interaction: discord.Interaction):
+        interaction.response.defer()
+        if await self.close_ticket_with_reason(interaction.channel, interaction.user, self.reason) == PermissionError:
+            await interaction.response.send_message("You don't have permissions to close this ticket.", ephemeral=True)
+        else:
+            await interaction.response.send("Ticket closed!", ephemeral=True)
 
 async def setup(bot) -> None:
     await bot.add_cog(Ticket(bot))
