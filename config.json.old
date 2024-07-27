@@ -15,13 +15,19 @@
                 "label": "Apply for staff",
                 "value": "staff_apply",
                 "description": "Apply for staff",
-                "questions": null
+                "questions": [
+                    "Whats your name?",
+                    "What would you like to apply for?",
+                    "Why should we pick you?"
+                ]
             },
             {
                 "label": "Other question",
                 "value": "other_question",
                 "description": "Something else?",
-                "questions": null
+                "questions": [
+                    "Your question or abut"
+                ]
             }
         ],
         "ticket_category_id": null,
